@@ -116,7 +116,7 @@ namespace LorakonSync
         public void SyncFile(string fileName, string checksum)
         {
             Database.InsertChecksum(checksum);
-            File.Move(fileName, settings.DestinationDirectory + Path.DirectorySeparatorChar + checksum + ".cnf");            
+            File.Copy(fileName, settings.DestinationDirectory + Path.DirectorySeparatorChar + checksum + ".cnf", true);
         }
 
         public void LoadSettings()
