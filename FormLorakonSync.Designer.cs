@@ -116,7 +116,6 @@
             this.Text = "Lorakon Sync";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormLorakonSync_FormClosing);
             this.Load += new System.EventHandler(this.FormLorakonSync_Load);
-            this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormLorakonSync_Paint);
             this.tabs.ResumeLayout(false);
             this.pageLog.ResumeLayout(false);
             this.ResumeLayout(false);

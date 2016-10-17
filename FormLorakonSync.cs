@@ -42,7 +42,6 @@ namespace LorakonSync
         private ConcurrentQueue<FileEvent> events = null;
         SQLiteConnection connection = null;
         private CTimer timer = null;
-        private bool initialized = false;
 
         public FormLorakonSync(NotifyIcon trayIcon)
         {
@@ -68,26 +67,49 @@ namespace LorakonSync
             Visible = false;
             ShowInTaskbar = false;
 
+            // Set default window layout
             Rectangle rect = Screen.FromControl(this).Bounds;
             Width = (rect.Right - rect.Left) / 2;
             Height = (rect.Bottom - rect.Top) / 2;
             Left = rect.Left + Width / 2;
             Top = rect.Top + Height / 2;
 
+            // Create environment and load settings
             if (!Directory.Exists(LorakonEnvironment.SettingsPath))
                 Directory.CreateDirectory(LorakonEnvironment.SettingsPath);            
-
             settings = new Settings();
             LoadSettings();
 
             events = new ConcurrentQueue<FileEvent>();            
             connection = Database.CreateConnection();
+            
+            // Sync files that has been created after last shutdown and has not been synced before
+            Database.OpenConnection(connection);
+            foreach (string fname in Directory.EnumerateFiles(settings.SourceDirectory, "*.cnf", SearchOption.AllDirectories))
+            {
+                DateTime dt = File.GetCreationTime(fname);
+                if (dt.CompareTo(settings.LastShutdownTime) < 0)
+                {
+                    lbLog.Items.Add("Skipping " + fname + ", older than last shutdown");
+                    continue;
+                }
 
+                string sum = FileOps.GetChecksum(fname);
+                if (!Database.HasChecksum(connection, sum))
+                {
+                    lbLog.Items.Add("Syncing " + fname + " [" + sum + "]");
+                    SyncFile(connection, fname, sum);
+                }
+            }
+            Database.CloseConnection(ref connection);
+
+            // Start timer for processing file events
             timer = new CTimer();
             timer.Interval = 500;
             timer.Tick += timer_Tick;
             timer.Start();
 
+            // Start monitoring file events
             monitor = new Monitor(settings, events);
             monitor.Start();
         }
@@ -99,7 +121,7 @@ namespace LorakonSync
                 FileEvent evt;
                 if (events.TryDequeue(out evt))
                 {
-                    if (!File.Exists(evt.FullPath))
+                    if (!File.Exists(evt.FullPath)) // This happens when the same event are reported more than once
                         continue;
                     
                     string sum = FileOps.GetChecksum(evt.FullPath);
@@ -109,7 +131,11 @@ namespace LorakonSync
                     {
                         lbLog.Items.Add("Syncing " + evt.FullPath + " [" + sum + "]");
                         SyncFile(connection, evt.FullPath, sum);
-                    }                    
+                    }
+                    else
+                    {
+                        lbLog.Items.Add("File " + evt.FullPath + " is already synced");
+                    }
                     Database.CloseConnection(ref connection);
                 }
             }
@@ -149,6 +175,9 @@ namespace LorakonSync
             if (MessageBox.Show("Er du sikker på at du vil stoppe synkronisering av Lorakon filer?", "Informasjon", MessageBoxButtons.YesNo) == DialogResult.No)
                 return;
 
+            settings.LastShutdownTime = DateTime.Now;
+            SaveSettings();
+
             monitor.Stop();
             timer.Stop();            
             Application.Exit();
@@ -185,26 +214,6 @@ namespace LorakonSync
             
             e.Cancel = true;            
             Hide();                
-        }
-
-        private void FormLorakonSync_Paint(object sender, PaintEventArgs e)
-        {
-            if(!initialized)
-            {
-                initialized = true;
-                string [] files = Directory.GetFiles(settings.SourceDirectory, "*.cnf", SearchOption.AllDirectories);
-                Database.OpenConnection(connection);
-                foreach(string fname in files)
-                {
-                    string sum = FileOps.GetChecksum(fname);                    
-                    if (!Database.HasChecksum(connection, sum))                    
-                    {
-                        lbLog.Items.Add("Syncing " + fname + " [" + sum + "]");
-                        SyncFile(connection, fname, sum);
-                    }
-                }
-                Database.CloseConnection(ref connection);
-            }
-        }
+        }        
     }
 }

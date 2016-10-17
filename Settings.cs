@@ -31,12 +31,14 @@ namespace LorakonSync
         public string SourceDirectory { get; set; }
         public string DestinationDirectory { get; set; }
         public string FileFilter { get; set; }
-        
+        public DateTime LastShutdownTime { get; set; }
+
         public Settings()
         {
             SourceDirectory = "C:\\LorakonSource";
             DestinationDirectory = "C:\\LorakonDestination";
             FileFilter = "*.cnf";
+            LastShutdownTime = DateTime.MinValue;
         }        
     }
 }
