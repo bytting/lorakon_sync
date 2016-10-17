@@ -28,6 +28,8 @@ using System.Windows;
 using System.Windows.Forms;
 using System.Xml;
 using System.Xml.Serialization;
+using System.Data;
+using System.Data.SQLite;
 using CTimer = System.Windows.Forms.Timer;
 
 namespace LorakonSync
@@ -38,7 +40,9 @@ namespace LorakonSync
         private Settings settings = null;
         private Monitor monitor = null;
         private ConcurrentQueue<FileEvent> events = null;
+        SQLiteConnection connection = null;
         private CTimer timer = null;
+        private bool initialized = false;
 
         public FormLorakonSync(NotifyIcon trayIcon)
         {
@@ -50,20 +54,13 @@ namespace LorakonSync
             trayMenu.MenuItems.Add("Logg", OnLog);
             trayMenu.MenuItems.Add("Innstillinger", OnSettings);
             trayMenu.MenuItems.Add("-");
-            trayMenu.MenuItems.Add("Informasjon", OnAbout);            
-            
+            trayMenu.MenuItems.Add("Informasjon", OnAbout);
+
             trayIcon.Text = "Lorakon Sync";
             trayIcon.Icon = Properties.Resources.LorakonIcon;
 
             trayIcon.ContextMenu = trayMenu;
             trayIcon.Visible = true;
-            
-            settings = new Settings();
-
-            events = new ConcurrentQueue<FileEvent>();
-            monitor = new Monitor(settings, events);
-
-            timer = new CTimer();            
         }        
 
         private void FormLorakonSync_Load(object sender, EventArgs e)
@@ -71,23 +68,28 @@ namespace LorakonSync
             Visible = false;
             ShowInTaskbar = false;
 
-            if (!Directory.Exists(LorakonEnvironment.SettingsPath))
-                Directory.CreateDirectory(LorakonEnvironment.SettingsPath);
-
-            Database.AquireDatabase();
-
             Rectangle rect = Screen.FromControl(this).Bounds;
             Width = (rect.Right - rect.Left) / 2;
             Height = (rect.Bottom - rect.Top) / 2;
             Left = rect.Left + Width / 2;
             Top = rect.Top + Height / 2;
 
-            LoadSettings();
-            monitor.Start();
+            if (!Directory.Exists(LorakonEnvironment.SettingsPath))
+                Directory.CreateDirectory(LorakonEnvironment.SettingsPath);            
 
+            settings = new Settings();
+            LoadSettings();
+
+            events = new ConcurrentQueue<FileEvent>();            
+            connection = Database.CreateConnection();
+
+            timer = new CTimer();
             timer.Interval = 500;
             timer.Tick += timer_Tick;
             timer.Start();
+
+            monitor = new Monitor(settings, events);
+            monitor.Start();
         }
 
         void timer_Tick(object sender, EventArgs e)
@@ -99,24 +101,24 @@ namespace LorakonSync
                 {
                     if (!File.Exists(evt.FullPath))
                         continue;
-
+                    
                     string sum = FileOps.GetChecksum(evt.FullPath);
-                    if (Database.HasChecksum(sum))
-                    {
-                        lbLog.Items.Add("Checksum [" + sum + "] already synced");
-                        continue;
-                    }
 
-                    lbLog.Items.Add("Syncing " + evt.FullPath + " [" + sum + "]");
-                    SyncFile(evt.FullPath, sum);
+                    Database.OpenConnection(connection);
+                    if (!Database.HasChecksum(connection, sum))                    
+                    {
+                        lbLog.Items.Add("Syncing " + evt.FullPath + " [" + sum + "]");
+                        SyncFile(connection, evt.FullPath, sum);
+                    }                    
+                    Database.CloseConnection(ref connection);
                 }
             }
-        }
-
-        public void SyncFile(string fileName, string checksum)
+        } 
+       
+        private void SyncFile(SQLiteConnection conn, string filename, string checksum)
         {
-            Database.InsertChecksum(checksum);
-            File.Copy(fileName, settings.DestinationDirectory + Path.DirectorySeparatorChar + checksum + ".cnf", true);
+            File.Copy(filename, settings.DestinationDirectory + Path.DirectorySeparatorChar + checksum + ".cnf", true);
+            Database.InsertChecksum(connection, checksum);
         }
 
         public void LoadSettings()
@@ -148,8 +150,7 @@ namespace LorakonSync
                 return;
 
             monitor.Stop();
-            timer.Stop();
-            Database.ReleaseDatabase();
+            timer.Stop();            
             Application.Exit();
         }
 
@@ -184,6 +185,26 @@ namespace LorakonSync
             
             e.Cancel = true;            
             Hide();                
+        }
+
+        private void FormLorakonSync_Paint(object sender, PaintEventArgs e)
+        {
+            if(!initialized)
+            {
+                initialized = true;
+                string [] files = Directory.GetFiles(settings.SourceDirectory, "*.cnf", SearchOption.AllDirectories);
+                Database.OpenConnection(connection);
+                foreach(string fname in files)
+                {
+                    string sum = FileOps.GetChecksum(fname);                    
+                    if (!Database.HasChecksum(connection, sum))                    
+                    {
+                        lbLog.Items.Add("Syncing " + fname + " [" + sum + "]");
+                        SyncFile(connection, fname, sum);
+                    }
+                }
+                Database.CloseConnection(ref connection);
+            }
         }
     }
 }

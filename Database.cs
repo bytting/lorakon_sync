@@ -25,76 +25,51 @@ using System.Data.SQLite;
 
 namespace LorakonSync
 {
-    public class Database
+    public static class Database
     {
-        private static SQLiteConnection connection;
-        private static SQLiteCommand command;        
-
-        public static bool AquireDatabase()
-        {
-            connection = new SQLiteConnection("Data Source=" + LorakonEnvironment.DatabaseFile + ";Version=3;Compress=True;");
-            command = new SQLiteCommand(connection);
+        public static SQLiteConnection CreateConnection()
+        {            
+            SQLiteConnection conn = new SQLiteConnection("Data Source=" + LorakonEnvironment.DatabaseFile + ";Version=3;Compress=True;");            
 
             if (!File.Exists(LorakonEnvironment.DatabaseFile))
-            {
-                try
-                {
-                    SQLiteConnection.CreateFile(LorakonEnvironment.DatabaseFile);
-                    connection.Open();
-                    command.CommandText = "create table sync_objects (checksum char(64))";
-                    command.ExecuteNonQuery();
-                }
-                finally
-                {
-                    if (connection.State == ConnectionState.Open)
-                        connection.Close();
-                }
+            {                
+                SQLiteConnection.CreateFile(LorakonEnvironment.DatabaseFile);                
+                SQLiteCommand cmd = new SQLiteCommand("create table sync_objects (checksum char(64))", conn);
+                conn.Open();
+                cmd.ExecuteNonQuery();
+                conn.Close();
             }
 
-            return true;
+            return conn;
         }
 
-        public static bool ReleaseDatabase()
+        public static void OpenConnection(SQLiteConnection conn)
         {
-            if (connection.State == ConnectionState.Open)
-                connection.Close();
-            return true;
+            if (conn != null && conn.State != ConnectionState.Open)
+                conn.Open();
         }
 
-        public static bool InsertChecksum(string cs)
+        public static void CloseConnection(ref SQLiteConnection conn)
         {
-            try
-            {
-                command.CommandText = "insert into sync_objects (checksum) values('" + cs + "')";
-                connection.Open();
-                command.ExecuteNonQuery();
-            }
-            finally
-            {
-                if (connection.State == ConnectionState.Open)
-                    connection.Close();
-            }
+            if (conn != null && conn.State == ConnectionState.Open)
+                conn.Close();            
+        }
 
+        public static bool InsertChecksum(SQLiteConnection conn, string cs)
+        {                            
+            SQLiteCommand cmd = new SQLiteCommand("insert into sync_objects (checksum) values('" + cs + "')", conn);                
+            cmd.ExecuteNonQuery();
             return false;
         }
 
-        public static bool HasChecksum(string cs)
-        {
-            try
-            {
-                connection.Open();                
-                command.CommandText = "select count(*) from sync_objects where checksum like '" + cs + "'";
-                object o = command.ExecuteScalar();
-                if (o == null || o == DBNull.Value)
-                    return false;
-                int nRows = Convert.ToInt32(o);
-                return nRows > 0;
-            }            
-            finally
-            {
-                if(connection.State == ConnectionState.Open)
-                    connection.Close(); 
-            }                        
+        public static bool HasChecksum(SQLiteConnection conn, string cs)
+        {            
+            SQLiteCommand cmd = new SQLiteCommand("select count(*) from sync_objects where checksum like '" + cs + "'", conn);                                
+            object o = cmd.ExecuteScalar();
+            if (o == null || o == DBNull.Value)
+                return false;
+            int nRows = Convert.ToInt32(o);
+            return nRows > 0;
         }
     }
 }

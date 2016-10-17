@@ -27,16 +27,13 @@ namespace LorakonSync
     class Monitor
     {
         FileSystemWatcher monitor = null;
-        DateTime lastChange = DateTime.MinValue;
-        Settings settings = null;
+        DateTime lastChange = DateTime.MinValue;        
         ConcurrentQueue<FileEvent> events = null;
 
         public Monitor(Settings s, ConcurrentQueue<FileEvent> evts)
-        {
-            settings = s;
+        {            
             events = evts;
-
-            monitor = new FileSystemWatcher(settings.SourceDirectory, settings.FileFilter);
+            monitor = new FileSystemWatcher(s.SourceDirectory, s.FileFilter);
             monitor.NotifyFilter = NotifyFilters.FileName | NotifyFilters.LastWrite;            
             monitor.Created += monitor_Created;
             monitor.Changed += monitor_Changed;

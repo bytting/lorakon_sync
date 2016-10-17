@@ -62,7 +62,7 @@
             // 
             // pageAbout
             // 
-            this.pageAbout.Location = new System.Drawing.Point(4, 25);
+            this.pageAbout.Location = new System.Drawing.Point(4, 24);
             this.pageAbout.Name = "pageAbout";
             this.pageAbout.Padding = new System.Windows.Forms.Padding(3);
             this.pageAbout.Size = new System.Drawing.Size(812, 522);
@@ -72,7 +72,7 @@
             // 
             // pageSettings
             // 
-            this.pageSettings.Location = new System.Drawing.Point(4, 25);
+            this.pageSettings.Location = new System.Drawing.Point(4, 24);
             this.pageSettings.Name = "pageSettings";
             this.pageSettings.Padding = new System.Windows.Forms.Padding(3);
             this.pageSettings.Size = new System.Drawing.Size(812, 522);
@@ -116,6 +116,7 @@
             this.Text = "Lorakon Sync";
             this.FormClosing += new System.Windows.Forms.FormClosingEventHandler(this.FormLorakonSync_FormClosing);
             this.Load += new System.EventHandler(this.FormLorakonSync_Load);
+            this.Paint += new System.Windows.Forms.PaintEventHandler(this.FormLorakonSync_Paint);
             this.tabs.ResumeLayout(false);
             this.pageLog.ResumeLayout(false);
             this.ResumeLayout(false);
