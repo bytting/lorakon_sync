@@ -87,10 +87,11 @@ namespace LorakonSync
             Database.OpenConnection(connection);
             foreach (string fname in Directory.EnumerateFiles(settings.SourceDirectory, "*.cnf", SearchOption.AllDirectories))
             {
-                DateTime dt = File.GetCreationTime(fname);
-                if (dt.CompareTo(settings.LastShutdownTime) < 0)
+                DateTime ctime = File.GetCreationTime(fname);
+                DateTime wtime = File.GetLastWriteTime(fname);
+                if (ctime.CompareTo(settings.LastShutdownTime) < 0 && wtime.CompareTo(settings.LastShutdownTime) < 0)                
                 {
-                    lbLog.Items.Add("Skipping " + fname + ", older than last shutdown");
+                    lbLog.Items.Add("Skipping " + fname + ", not modified since last shutdown");
                     continue;
                 }
 

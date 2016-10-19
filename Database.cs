@@ -26,7 +26,7 @@ using System.Data.SQLite;
 namespace LorakonSync
 {
     public static class Database
-    {
+    {        
         public static SQLiteConnection CreateConnection()
         {            
             SQLiteConnection conn = new SQLiteConnection("Data Source=" + LorakonEnvironment.DatabaseFile + ";Version=3;Compress=True;");            
